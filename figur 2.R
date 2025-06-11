@@ -1,0 +1,623 @@
+library(readxl)
+library(lubridate)
+library(reshape2)
+library(ggsurvfit)
+library(gtsummary)
+library(tidycmprsk)
+library(readxl)
+library(tidyverse)
+library(survival)
+library(survminer)
+library(ggprism)
+library(ggpubr)
+library(gridExtra)
+library(pammtools)
+library(ggrepel)
+library(mgcv)
+library(epitools)
+library(blme)
+library(flextable)
+library(ggplot2)
+library(ggsignif)
+library(ggpubr)
+library(readr)
+library(sm)
+library(stats)
+library(rstatix)
+library(epiDisplay)
+library(MASS)
+library(foreign)
+library(survival)
+library(gdata)
+library(gmodels)
+library(summarytools)
+library(xtable)
+library(tidyr)
+library(ggfortify)
+library(survminer)
+library(ggpubr)
+library(dplyr)
+library(tidyverse)
+library(ggprism)
+library(haven)
+library(dplyr)
+library(readxl)
+# Load the reshape2 package
+par_prevalence = read.xlsx("D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\fig2D.xlsx")
+
+long_df <- par_prevalence %>%
+  pivot_longer(cols = c(mic_status,pf_positivity),
+               names_to = "Mic_and_18sqpcr",
+               values_to = "Value") %>%
+  mutate(density = ifelse(Mic_and_18sqpcr == "mic_status", mic_dens, pf_par_ul))
+
+long_df <- long_df %>%
+  mutate(Mic_and_18sqpcr = ifelse(Mic_and_18sqpcr == "mic_status", "Microscopy", "18S qPCR"))
+table(par_prevalence$pf_positivity)
+###
+long_df <- long_df %>%
+  mutate(Mic_pf_positivity = ifelse(Value == "Negative", 0,
+                                              ifelse(Value == "P. falciparum", 1,
+                                                     ifelse(Value == "Positive", 1,NA))))
+table(long_df$Mic_pf_positivity)
+###
+# Create the 'prevalence' column if it doesn't exist
+long_df <- long_df %>%
+  mutate(prevalence = ifelse(Mic_pf_positivity ==0, 0,
+                             ifelse(Mic_pf_positivity ==1 ,1,NA)))
+
+long_df= long_df %>%
+  filter(time %in% c(0, 1, 2, 3, 7,  14,  21 , 28))
+#####
+percentage=long_df %>%
+  filter(!is.na(prevalence)) %>%
+  group_by(day,Mic_and_18sqpcr) %>%
+  summarise(total = n(), 
+            positive = sum(prevalence),
+            prop = (positive / total)*100
+  )%>% ungroup()
+##percentage$####
+percentage$prop=as.numeric(percentage$prop)
+# Calculate standard error for the proportion
+percentage <- percentage %>%
+  group_by(day, Mic_and_18sqpcr) %>%
+  mutate(mean_prop = mean(prop),
+         se_prop = (prop*(1-prop)) / sqrt(total))
+###
+percentage$prop1=percentage$prop/100
+
+#percentage$se <- with(percentage, ifelse(prop1 > 0, sqrt(prop1 * (1 - prop1) / n), NA))
+percentage$se <- ifelse(!is.na(percentage$prop1), sqrt(percentage$prop1 * (1 - percentage$prop1) / percentage$total), NA)
+
+my_colors=c("Microscopy" = "#BC3C29FF", "18S qPCR" =  "#0072B5FF")
+
+# Assuming 'day', 'prop1', 'se', and 'Mic_and_18sqpcr' are columns in percentage data frame
+percentage <- data.frame(day = factor(percentage$day, levels = c(0, 1, 2, 3, 7,14, 21, 28)),
+                         prop1 = percentage$prop1,
+                         se = percentage$se,
+                         Mic_and_18sqpcr = percentage$Mic_and_18sqpcr)
+percentage=percentage%>%
+  filter(day%in%c(0,1,2,3,7,14,21,28))
+# Plot the proportion with error bars
+percentage$day <- factor(percentage$day, levels = c(0, 1, 2, 3, 7, 14, 21, 28))
+pre_all=ggplot(percentage, aes(x = factor(day), y = prop1 * 100, fill = Mic_and_18sqpcr)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = prop1 * 100 - se * 100, ymax = prop1 * 100 + se * 100), size= 0.1, width = 0.1, position = position_dodge(0.9)) +
+  labs(title = "",
+       x = element_text("Days", face = "bold", size=2),
+       y = element_text("Parasite prevalence , %", face = "bold",size=2)) +
+  #facet_grid(~site_tes) +
+  scale_fill_manual(values = my_colors) +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = NULL)) +  # Removing legend title
+  scale_y_continuous(limits = c(0, 100)) +  # Setting y-axis limits to 0-100
+  guides(fill = guide_legend(title = NULL)) +  # Removing legend title
+  theme(legend.title = element_text(face = "bold"))+  # Make legend title bold
+  theme_pubr()+
+  theme(
+        guides(fill = FALSE, color = FALSE),  # Remove the legend for both fill and color aesthetics
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),  # Adjust the length of the ticks here
+    axis.ticks.length = unit(0.01, "cm"),  # Adjust the length of the ticks here
+    axis.line = element_line(size = 0.1),  # Adjust axis line size
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_blank(),       # Hide the primary y-axis text
+    axis.text.x = element_text(size=2,family = "Times New Roman"),      # Hide the primary y-axis ticks
+    axis.text.y = element_text(size = 2,family = "Times New Roman"),  # Adjust x-axis label size
+    axis.title =  element_text(size = 2,family = "Times New Roman"),  # Adjust y-axis label size
+    plot.title = element_text(family = "Times New Roman", size = 10,face="bold")  # Customize title font and size
+  )
+pre_all
+# Now save with cairo_pdf device which handles fonts better
+violine_plot= read.xlsx("D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\fig2E.xlsx")
+violine_plot$day <- factor(violine_plot$day, levels = c(0, 1, 2, 3, 7, 14, 21, 28))
+
+plot1 <- ggplot(violine_plot, aes(x = as.factor(day), y = log10(pf_par_ul + 0.9))) +
+  geom_violin(trim = TRUE, width = 1.2, size = 0.1, alpha = 0.6) +
+  geom_jitter(aes(color = factor(mic_status)), width = 0.2, alpha = 0.4, size = 0.15, stroke = 0.15) +
+  scale_color_manual(values = c("#0072B5FF", "#BC3C29FF", "red"), 
+                     labels = c("Negative", "Positive", "Median")) +
+  stat_summary(fun = median, geom = "point", aes(color = "Median"), 
+               size = 0.01, stroke = 0.2) +
+  labs(y = "Pf18s qPCR\n parasitemia, Log10", x = "Days") +
+  scale_x_discrete(drop = TRUE) +
+  theme_pubr() +
+  theme(
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),
+    axis.ticks.length = unit(0.01, "cm"),
+    axis.line = element_line(size = 0.1),
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    axis.text.x = element_text(size = 2, family = "Times New Roman"),
+    axis.text.y = element_text(size = 2, family = "Times New Roman"),
+    axis.title = element_text(size = 2, family = "Times New Roman"),
+    plot.title = element_text(family = "Times New Roman", size = 10, face = "bold")
+  )
+plot1
+
+### gametocyte prevalnce
+gam_prevalnce =read.xlsx("D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\fig3A_B.xlsx")
+long_df <- gam_prevalnce %>%
+  mutate(prevalence = ifelse(gam_status =="Negative", 0,
+                             ifelse(gam_status =="Positive",1,NA)))
+
+percentage=long_df %>%
+  filter(!is.na(prevalence)) %>%
+  group_by(day) %>%
+  summarise(total = n(), 
+            positive = sum(prevalence),
+            prop = (positive / total)*100
+  )%>% ungroup()
+##percentage$####
+percentage$prop=as.numeric(percentage$prop)
+# Calculate standard error for the proportion
+percentage <- percentage %>%
+  group_by(day) %>%
+  mutate(mean_prop = mean(prop),
+         se_prop = (prop*(1-prop)) / sqrt(total))
+###
+percentage$prop1=percentage$prop/100
+
+#percentage$se <- with(percentage, ifelse(prop1 > 0, sqrt(prop1 * (1 - prop1) / n), NA))
+percentage$se <- ifelse(!is.na(percentage$prop1), sqrt(percentage$prop1 * (1 - percentage$prop1) / percentage$total), NA)
+#####
+percentage$day <- factor(percentage$day, levels = c(0, 1, 2, 3, 7, 14, 21, 28))
+gam_all=ggplot(percentage, aes(x = factor(day), y = prop1 * 100)) +
+  # geom_bar(stat = "identity", position = "dodge",fill = "#E18727FF", color = "#E18727FF") +
+  #geom_bar(stat = "identity", position = "dodge",fill = "#6F99Ad99", color = "#6F99Ad99") +
+  geom_bar(stat = "identity",width=0.5, position = "dodge",fill = "#BC3C29FF", color = "#BC3C29FF") +
+  #geom_bar(stat = "identity", position = "dodge",fill = "#009", color = "#009") +
+  geom_errorbar(aes(ymin = prop1 * 100 - se * 100, ymax = prop1 * 100 + se * 100), width = 0.1, size=0.1, position = position_dodge(0.9)) +
+  labs(title = "",
+       x = "Days",
+       y = "Gametocyte prevalence ,%") +
+  #facet_wrap(~site_tes) +
+  scale_fill_manual(values = my_colors) +
+  guides(fill = guide_legend(title = NULL)) +  # Removing legend title
+  scale_y_continuous(limits = c(0, 30)) +  # Setting y-axis limits to 0-100
+  guides(fill = guide_legend(title = NULL)) +  # Removing legend title
+  theme(legend.title = element_text(face = "bold"))+  # Make legend title bold
+  theme_pubr()+
+  theme(
+    guides(fill = FALSE, color = FALSE),  # Remove the legend for both fill and color aesthetics
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),  # Adjust the length of the ticks here
+    axis.ticks.length = unit(0.01, "cm"),  # Adjust the length of the ticks here
+    axis.line = element_line(size = 0.1),  # Adjust axis line size
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_blank(),       # Hide the primary y-axis text
+    axis.text.x = element_text(size=2,family = "Times New Roman"),      # Hide the primary y-axis ticks
+    axis.text.y = element_text(size = 2,family = "Times New Roman"),  # Adjust x-axis label size
+    axis.title =  element_text(size = 2,family = "Times New Roman"),  # Adjust y-axis label size
+    plot.title = element_text(family = "Times New Roman", size = 10,face="bold")  # Customize title font and size
+  )
+### 
+gam_prevalnce$day <- factor(gam_prevalnce$day, levels = c(0, 1, 2, 3, 7, 14, 21, 28))
+gam1 <- ggplot(data = gam_prevalnce, aes(x = as.factor(day), y = log10(gam_dens), fill = as.factor(day)))+
+  #geom_violin(trim = FALSE, fill = "white", color = "#BC3C29FF", size = 0.1, alpha = 0.8, width = 1) +  # Increase the width of the violin plot
+  #geom_jitter(width = 0.2, alpha = 0.4,size=0.1,stroke = 0.15, color ="#BC3C29FF") +
+  #stat_summary(fun = median, geom = "point", color = "red", size = 0.1, shape = 20, position = position_dodge(width = 0.75)) +
+  geom_violin(trim = FALSE, fill = "white", color = "#BC3C29FF", width = 0.9, size = 0.1, alpha = 0.6, position = position_dodge(width = 0.9)) +
+  geom_jitter(color ="#BC3C29FF", width = 0.1, alpha = 0.6,size=0.1,stroke = 0.15) +
+  #scale_color_manual(values = c("#0072B5FF", "#BC3C29FF", "red"), labels = c("Negative", "Positive", "Median")) +
+  stat_summary(fun = median, geom = "point", aes(color = "red"), size = 0.01, stroke = 0.2, position = position_dodge(width = 0.6)) +
+  labs(color = "") +
+  #ylim(1,4000) +
+  labs(title = "",
+       x = "Days",
+       y = "Sexual parasite/µL, log10") +
+  theme_pubr()+
+  theme(
+    guides(fill = FALSE, color = FALSE),  # Remove the legend for both fill and color aesthetics
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),  # Adjust the length of the ticks here
+    axis.ticks.length = unit(0.01, "cm"),  # Adjust the length of the ticks here
+    axis.line = element_line(size = 0.1),  # Adjust axis line size
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_blank(),       # Hide the primary y-axis text
+    axis.text.x = element_text(size=2,family = "Times New Roman"),      # Hide the primary y-axis ticks
+    axis.text.y = element_text(size = 2,family = "Times New Roman"),  # Adjust x-axis label size
+    axis.title =  element_text(size = 2,family = "Times New Roman"),  # Adjust y-axis label size
+    plot.title = element_text(family = "Times New Roman", size = 10,face="bold")  # Customize title font and size
+  )
+gam1 
+## figure 2C KM plot
+
+pcr_mic_density= read.xlsx("D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\par_density and pcr rate.xlsx")
+
+long_form_data <- pcr_mic_density %>%
+  pivot_longer(cols = c(par_status, parpcr_status),
+               names_to = "Category",
+               values_to = "Status") %>%
+  mutate(time_status = ifelse(Category == "par_status", time_par_mic, time_pcr))
+
+
+# Rename the levels in the Category column
+long_form_data <- long_form_data %>%
+  mutate(Category = ifelse(Category == "par_status", "Microscopy", "Pf18S qPCR"))
+
+long_form_data $ time_status = as.numeric(long_form_data$time_status)
+
+######
+### i want to do for each site
+long_form_data$day_To_transformed1 <- long_form_data$time_status  %>% 
+  recode("1" = "1","2"="2", "3" = "3", "7" = "4", "14" = "5", "21" = "6", "28" = "7")
+long_form_data$day_To_transformed1 = as.numeric(long_form_data$day_To_transformed1)
+# Fit the survival model and create the ggsurvplot
+km6a <- survfit(Surv(day_To_transformed1, Status) ~ Category, data = long_form_data)
+# Create the plot with matching confidence interval colors
+survout6a <- survminer::ggsurvplot(
+  km6a, 
+  conf.int = TRUE, 
+  #conf.int.fill = c("#BC3C29FF", "#0072B5FF"),  # Match fill colors to line colors
+  conf.int.alpha = 0.2,  # Adjust transparency if needed
+  break.time.by = 1, 
+  risk.table = TRUE, 
+  risk.table.y.text.col = FALSE,
+  xlim = c(0, 7), 
+  censor.size = 0.1, 
+  size = 0.1, 
+  risk.table.fontsize = 0.2, 
+  pch = 0.1, 
+  ris.table.height = 0.2,
+  palette = c("#BC3C29FF", "#0072B5FF")  # Ensure line colors match
+)
+dt6a <- survout6a$data.survplot
+
+# Define custom labels for x-axis
+custom_labels <- c(0, 1, 2, 3, 7, 14, 21, 28)
+
+# Modify the plot appearance
+plot_only_par<- survout6a$plot +
+  xlab("") +
+  #scale_y_continuous(breaks=c(0.0,0.2,0.4,0.6,0.8,1.0),labels = function(x) paste0(x , "")) +
+  scale_y_continuous(breaks=c(0.0,0.2,0.4,0.6,0.8,1.0),labels = scales::number_format(accuracy = 0.1, scale = 1)) +
+  ylab("Probability of\n parasite clearance") +
+  #ylab("") +
+  scale_x_continuous(limits = c(0, 7), breaks = c(0, 1, 2, 3, 4, 5, 6, 7), labels = custom_labels) +
+  coord_cartesian(clip = "off") +
+  theme_pubr() +
+  labs(title = "",size=3)+
+  theme(
+    guides(fill = FALSE, color = FALSE),  # Remove the legend for both fill and color aesthetics
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),  # Adjust the length of the ticks here
+    axis.ticks.length = unit(0.01, "cm"),  # Adjust the length of the ticks here
+    axis.line = element_line(size = 0.1),  # Adjust axis line size
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_blank(),       # Hide the primary y-axis text
+    axis.text.x = element_text(size=2,family = "Times New Roman"),      # Hide the primary y-axis ticks
+    axis.text.y = element_text(size = 2,family = "Times New Roman"),  # Adjust x-axis label size
+    axis.title =  element_text(size = 2,family = "Times New Roman"),  # Adjust y-axis label size
+    plot.title = element_text(family = "Times New Roman", size = 10,face="bold")  # Customize title font and size
+  ) +
+  scale_color_manual(values = c("#BC3C29FF","#0072B5FF"), labels = c( "Microscopy", "Pf18S qPCR")) +
+  scale_fill_manual(values = c("#BC3C29FF","#0072B5FF"), labels = c( "Microscopy", "Pf18S qPCR"))
+
+# Print the modified plot
+print(plot_only_par)
+###### risk table only
+km6a <- survfit(Surv(day_To_transformed1, Status) ~ Category, data = long_form_data)
+survout6a <- survminer::ggsurvplot(km6a, conf.int = FALSE, break.time.by = 1, risk.table = TRUE, risk.table.y.text.col = FALSE,
+                                   xlim = c(0, 7), size = 0.2, risk.table.fontsize = 2, pch=0.1, ris.table.height = 0.2)
+dt6a <- survout6a$data.survplot
+
+# Define custom labels for x-axis
+custom_labels <- c(0, 1, 2, 3, 7, 14, 21, 28)
+risk_table=  survout6a$data.survtable [survout6a$data.survtable$time %in% c(0:7),] %>%
+  ggplot(aes(x = time, y = strata, label = n.risk)) +
+  geom_text(size = 2.5, color = "black") +  # Adjust the size here to control the text size
+  scale_y_discrete(labels = c( "Microscopy", "qPCR")) +
+  theme_pubr() +
+  theme(axis.title.y = element_blank()) +
+  theme(  
+    axis.title.y = element_blank(),
+    plot.title = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.line = element_blank(),
+    axis.text.y = element_text(colour = c("#BC3C29FF","#0072B5FF",  "#E18727FF",  "#EE4C97FF","#6F99ADFF"), size = 1)) +
+  #axis.text.y = element_text(colour = c("#FBB4AEFF", "#B3CDE3FF", "#CCEBC5FF", "#DECBE4FF", "#FED9A6FF"), size = 10)) +
+  xlab("Time (days)") +
+  scale_x_continuous(limits = c(0, 7), breaks = c(0, 1, 2, 3, 4, 5, 6, 7), labels = custom_labels) 
+
+risk_table
+######
+km6a <- survfit(Surv(day_To_transformed1, Status) ~ Category, data = long_form_data)
+survout6a <- survminer::ggsurvplot(km6a, conf.int = FALSE, break.time.by = 1, risk.table = TRUE, risk.table.y.text.col = FALSE,
+                                   xlim = c(0, 7), size = 0.2,  ncensor.plot = TRUE,risk.table.fontsize = 2, pch=0.1, ris.table.height = 0.2)
+dt6a <- survout6a$data.survplot
+
+# Define custom labels for x-axis
+custom_labels <- c(0, 1, 2, 3, 7, 14, 21, 28)
+censor=  survout6a$ncensor.plot +
+  labs(x = "Days", y = "censor") +
+  #labs(x = "", y = "") +
+  scale_x_continuous(limits = c(0, 7), breaks = c(0:7), labels = custom_labels) +
+  ##scale_x_continuous(limits = c(0, 28), breaks = c(0:3, 7,14,21,28)) +
+  # scale_x_continuous(limits = c(0, 7), breaks = c(0, 1, 2, 3, 4, 5, 6, 7), labels = custom_labels) 
+  theme_pubr() +
+  theme(
+    guides(fill = FALSE, color = FALSE),  # Remove the legend for both fill and color aesthetics
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),  # Adjust the length of the ticks here
+    axis.ticks.length = unit(0.01, "cm"),  # Adjust the length of the ticks here
+    axis.line = element_line(size = 0.1),  # Adjust axis line size
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_blank(),       # Hide the primary y-axis text
+    axis.text.x = element_text(size=2,family = "Times New Roman"),      # Hide the primary y-axis ticks
+    axis.text.y = element_text(size = 2,family = "Times New Roman"),  # Adjust x-axis label size
+    axis.title =  element_text(size = 2,family = "Times New Roman"),  # Adjust y-axis label size
+    plot.title = element_text(family = "Times New Roman", size = 2,face="bold")  # Customize title font and size
+  )  +
+  theme(legend.position = "none") +  # Remove the legend
+  guides(fill = guide_legend(title = NULL)) +  # Exclude legend title for fill scale
+  scale_color_manual(values = c("#BC3C29FF","#0072B5FF", "#E18727FF", "#EE4C97FF","#6F99ADFF"), labels = c("Ababo", "Asayita", "Asosa", "Maksegnit", "Mizan")) +
+  scale_fill_manual(values = c("#BC3C29FF","#0072B5FF","#E18727FF", "#EE4C97FF","#6F99ADFF"), labels = c("Ababo", "Asayita", "Asosa", "Maksegnit", "Mizan"))
+censor
+### combine plot
+plot_only_par <- plot_only_par + 
+  theme(plot.margin = margin(0, 0, 0, 0, "cm"))
+
+risk_table <- risk_table + 
+  theme(
+    plot.margin = margin(0, 0, 0, 0, "cm"),
+    axis.text.y = element_text(size = 2, hjust = 1, margin = margin(r = 2))  # Right-align Y-axis text
+  )
+
+censor <- censor + 
+  theme(
+    plot.margin = margin(0, 0, 0, 0, "cm")
+  )
+
+# 2. Arrange plots with forced Y-axis alignment
+AA <- ggarrange(
+  plot_only_par,risk_table,
+  
+  censor,
+  nrow = 3,
+  ncol = 1,
+  heights = c(1, 0.5,0.5),  # Adjust heights to compress gaps
+  align = "v"                    # Strict vertical alignment
+)
+AA
+
+###### for figure 2 A treatment outcome
+itt= read_xls("D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\Figure 2A endpoint.xls")
+
+itt$day_To_transformed1 <- itt$Day  %>% 
+  recode("1" = "1","2"="2", "3" = "3", "7" = "4", "14" = "5", "21" = "6", "28" = "7")
+itt$day_To_transformed1 = as.numeric(itt$day_To_transformed1)
+# Fit the survival model and create the ggsurvplot
+km6a <- survfit(Surv(day_To_transformed1, itt) ~ 1, data = itt)
+survout6a <- survminer::ggsurvplot(km6a, conf.int = T,conf.int.fill = "#BC3C29FF",  break.time.by = 1, risk.table = TRUE, risk.table.y.text.col = TRUE,
+                                   xlim = c(0, 7),palette = c("#BC3C29FF"), censor.size = 0.1, size = 0.1, risk.table.fontsize = 0.2, pch=0.1, ris.table.height = 0.2)
+dt6a <- survout6a$data.survplot
+
+# Define custom labels for x-axis
+custom_labels <- c(0, 1, 2, 3, 7, 14, 21, 28)
+
+# Modify the plot appearance
+itt_Dj<- survout6a$plot +
+  xlab("Days") +
+  #scale_y_continuous(breaks=c(0.0,0.2,0.4,0.6,0.8,1.0),labels = function(x) paste0(x , "")) +
+  #scale_y_continuous(breaks=c(0.0,0.2,0.4,0.6,0.8,1.0),labels = scales::number_format(accuracy = 0.1, scale = 1)) +
+  scale_y_continuous(limits = c(0.6, 1.0),  # <-- Set y-axis limits from 0.5 to 1.0
+                     breaks = seq(0.6, 1.0, by = 0.2), 
+                     labels = scales::number_format(accuracy = 0.1, scale = 1)) +
+  ylab("Probability of \n treatment success") +
+  #ylab("") +
+  
+  scale_x_continuous(limits = c(0, 7), breaks = c(0, 1, 2, 3, 4, 5, 6, 7), labels = custom_labels) +
+  coord_cartesian(clip = "off") +
+  theme_pubr() +
+  labs(title = "")+
+  theme(
+    guides(fill = FALSE, color = FALSE),  # Remove the legend for both fill and color aesthetics
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),  # Adjust the length of the ticks here
+    axis.ticks.length = unit(0.01, "cm"),  # Adjust the length of the ticks here
+    axis.line = element_line(size = 0.1),  # Adjust axis line size
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_blank(),       # Hide the primary y-axis text
+    axis.text.x = element_text(size=2,family = "Times New Roman"),      # Hide the primary y-axis ticks
+    axis.text.y = element_text(size = 2,family = "Times New Roman"),  # Adjust x-axis label size
+    axis.title =  element_text(size = 2,family = "Times New Roman"),  # Adjust y-axis label size
+    plot.title = element_text(family = "Times New Roman", size = 2,face="bold")  # Customize title font and size
+  )   +
+  scale_color_manual(values = c("#BC3C29FF","#BC3C29FF"), labels = c( "PCR corrected", "PCR Uncorrected")) +
+  scale_fill_manual(values = c("#BC3C29FF","#BC3C29FF"), labels = c( "PCR corrected", "PCR Uncorrected")) 
+
+# Print the modified plot
+print(itt_Dj)
+###
+
+###### risk table only
+km6a <- survfit(Surv(day_To_transformed1, itt) ~ 1, data = itt)
+survout6a <- survminer::ggsurvplot(km6a, conf.int = FALSE, break.time.by = 1, risk.table = TRUE, risk.table.y.text.col = FALSE,
+                                   xlim = c(0, 7),palette = c("#BC3C29FF", "#BC3C29FF"), censor.size = 0.1, size = 0.1, risk.table.fontsize = 0.2, pch=0.1, ris.table.height = 0.2)
+dt6a <- survout6a$data.survplot
+
+# Define custom labels for x-axis
+custom_labels <- c(0, 1, 2, 3, 7, 14, 21, 28)
+risk_table=  survout6a$data.survtable [survout6a$data.survtable$time %in% c(0:7),] %>%
+  ggplot(aes(x = time, y = strata, label = n.risk)) +
+  geom_text(size = 0.5, color = "black") +  # Adjust the size here to control the text size
+  scale_y_discrete(labels = c( "Microscopy", "qPCR")) +
+  theme_pubr() +
+  
+  theme(axis.title.y = element_blank()) +
+  theme(  
+    axis.title.y = element_blank(),
+    plot.title = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.line = element_blank(),
+        axis.text.y = element_text(colour = c("#BC3C29FF","#0072B5FF",  "#E18727FF",  "#EE4C97FF","#6F99ADFF"), size = 2)) +
+  scale_color_manual(values = c("#BC3C29FF","#BC3C29FF"), labels = c( "PCR corrected", "PCR Uncorrected")) +
+  scale_fill_manual(values = c("#BC3C29FF","#BC3C29FF"), labels = c( "PCR corrected", "PCR Uncorrected"))  +
+  
+  xlab("Days") +
+  scale_x_continuous(limits = c(0, 7), breaks = c(0, 1, 2, 3, 4, 5, 6, 7), labels = custom_labels) 
+
+ggarrange(itt_Dj,risk_table,nrow = 2,ncol=1)
+## figure 2b
+fig2b = read.xlsx( "D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\fig2B.xlsx")
+new_tes_data_filtered_new = fig2b %>%
+  mutate(mic_gam_pos = ifelse(mic_status == "Positive" & gam_status== "Negative", "Asexual(+) only",
+                              ifelse(gam_status == "Positive" & mic_status== "Negative", "Gameteocyte(+) only",
+                                     ifelse(mic_status == "Positive" & gam_status== "Positive", "Asexual and Gameteocyte(+)",NA))))
+
+table(new_tes_data_filtered_new $ mic_gam_pos)
+new_tes_data_filtered_new$ gam_dens <- as.numeric(gsub(",", "", new_tes_data_filtered_new$gam_dens))
+new_tes_data_filtered_new$ mic_dens <- as.numeric(gsub(",", "", new_tes_data_filtered_new$mic_dens))
+new_tes_data_filtered_new$pf_par_ul=as.numeric(gsub(",", "", new_tes_data_filtered_new$pf_par_ul))
+## correlation
+cor.test((new_tes_data_filtered_new$pf_par_ul), (new_tes_data_filtered_new$mic_dens), method = "pearson")
+
+new_tes_data_filtered_new1 <- new_tes_data_filtered_new %>%
+  filter(!is.na(mic_gam_pos))
+# Create the ggplot scatter plot with NA values excluded
+scatter <- ggplot(new_tes_data_filtered_new1, aes(x = log10(mic_dens +1 ), y = log10(pf_par_ul), color = mic_gam_pos, size = 1)) +
+  geom_point(width = 0.2, alpha = 0.4,size = 2.1, stroke = 0.15) +
+  scale_color_manual(values = c("Asexual(+) only" = "red", 
+                                "Gameteocyte(+) only" = "#0072b5",
+                                "Asexual and Gameteocyte(+)" = "#BC3C29FF")) +
+  xlab("Microscopic parasitemia, Log10") +
+  ylab("Pf18S qPCR parasitemia, Log10") +
+  theme_pubr() +
+  theme(
+    legend.position = "bottom",
+    legend.box = "vertical",
+    legend.direction = "horizontal",
+    legend.justification = c(0.25, 0.5),
+   # legend.box.just = "top",
+    legend.spacing.x = unit(0, "cm"),  # Negative space to pull points right
+    legend.text = element_text(
+      size = 1.65,
+      family = "serif",
+      margin = margin(l = 0.1, r = -5.5, unit = "pt")  # Pull text left
+    ),
+    legend.margin = margin(t = -0.4, b = -0.1, unit = "cm"),
+    #legend.box.margin = margin(-5, 0, 0, 0, unit = "pt"),
+    #legend.key = element_rect(color = NA),  # Remove key background
+    legend.key.size = unit(0.1, "cm"),
+    legend.key.width = unit(0.1, "cm"),
+    #legend.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm"),
+    plot.margin = margin(t = 0, r = 0, b = 1, l = 0, unit = "cm"),
+    legend.title = element_blank(),
+    axis.ticks = element_line(size = 0.15),  
+    axis.ticks.length = unit(0.01, "cm"),  
+    axis.line = element_line(size = 0.1),  
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    axis.text.x = element_text(size = 2, family = "Times New Roman"),      
+    axis.text.y = element_text(size = 2, family = "Times New Roman"),  
+    axis.title = element_text(size = 2, family = "Times New Roman")
+  ) +
+  guides(color = guide_legend(
+    override.aes = list(size = 0.1),
+    label.position = "right"  # Ensures labels are to the right of the points
+  )) +
+  
+  annotate("text", x = 0, y = 6, 
+           label = "R=0.88, p<0.001", 
+           hjust = 0, vjust = 1, 
+           size = 0.65, color = "black")
+
+scatter
+
+###
+
+temp= read_xlsx("D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\fever clerance and hgb recovery.xlsx")
+temp= temp %>%
+  filter(day %in% c("1","2","3","7","14","21","28"))
+temp$day= as.factor(temp$day)
+temp_update <- ggplot(temp, aes(x = day, y = prop), color = "#BC3C29FF") +
+  geom_bar(position = "stack", stat = "identity", fill = "#BC3C29FF",width = 0.9) +
+  labs(title = "",
+       x = "Days",
+       y = "Fever clearance (%)") +
+  scale_fill_manual(values = c("Febrile" = "mediumvioletred", "Non-febrile" = "midnightblue")) +
+    theme_pubr() +
+  theme(legend.position = "bottom") +
+  theme(
+    guides(fill = FALSE, color = FALSE),  # Remove the legend for both fill and color aesthetics
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),  # Adjust the length of the ticks here
+    axis.ticks.length = unit(0.01, "cm"),  # Adjust the length of the ticks here
+    axis.line = element_line(size = 0.1),  # Adjust axis line size
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_blank(),       # Hide the primary y-axis text
+    axis.text.x = element_text(size=2,family = "Times New Roman"),      # Hide the primary y-axis ticks
+    axis.text.y = element_text(size = 2,family = "Times New Roman"),  # Adjust x-axis label size
+    axis.title =  element_text(size = 2,family = "Times New Roman"),  # Adjust y-axis label size
+    plot.title = element_text(family = "Times New Roman", size = 10,face="bold")  # Customize title font and size
+  )
+
+temp_update
+## for hgb
+hgbr= temp %>%
+  filter(day_an %in% c("7","14","21","28"))
+hgbr$day_an= as.factor(hgbr$day_an)
+hgb_update <- ggplot(hgbr, aes(x = day_an, y = prop_an), color = "#BC3C29FF") +
+  geom_bar(position = "stack", stat = "identity", fill = "#BC3C29FF",width = 0.5) +
+  labs(title = "",
+       x = "Days",
+       y = "Anemia recovery (%)") +
+  scale_fill_manual(values = c("Febrile" = "mediumvioletred", "Non-febrile" = "midnightblue")) +
+  theme(
+    axis.line = element_line(size = 0.5),  # Adjust axis line size
+    axis.text.x = element_text(size = 4),  # Adjust x-axis text size
+    axis.text.y = element_text(size = 4),  # Adjust y-axis text size
+    legend.position = "bottom"  # Adjust legend position
+  ) +
+  ylim(0,60) +
+  theme_pubr() +
+  theme(legend.position = "bottom") +
+  theme(
+    guides(fill = FALSE, color = FALSE),  # Remove the legend for both fill and color aesthetics
+    legend.position = "none",
+    axis.ticks = element_line(size = 0.15),  # Adjust the length of the ticks here
+    axis.ticks.length = unit(0.01, "cm"),  # Adjust the length of the ticks here
+    axis.line = element_line(size = 0.1),  # Adjust axis line size
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_blank(),       # Hide the primary y-axis text
+    axis.text.x = element_text(size=2,family = "Times New Roman"),      # Hide the primary y-axis ticks
+    axis.text.y = element_text(size = 2,family = "Times New Roman"),  # Adjust x-axis label size
+    axis.title =  element_text(size = 2,family = "Times New Roman"),  # Adjust y-axis label size
+    plot.title = element_text(family = "Times New Roman", size = 10,face="bold")  # Customize title font and size
+  )
+## temprature and hgb
+tem_hgb= ggarrange(temp_update,hgb_update,ncol=2)
