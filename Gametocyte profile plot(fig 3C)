@@ -11,7 +11,8 @@ library(tidyr)
 library(ggfortify)
 library(dplyr)
 library(haven)
-Djibuti_21 = read.xlsx ("D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\fig3C gam profile.xlsx")
+## data
+Djibuti_21 = read.xlsx ("fig3C gam profile.xlsx")
 # make it as numeric
 Djibuti_21$mic_dens <- as.numeric(gsub(",", "", Djibuti_21$mic_dens))
 Djibuti_21$pf_par_ul <- as.numeric(gsub(",", "", Djibuti_21$pf_par_ul))
