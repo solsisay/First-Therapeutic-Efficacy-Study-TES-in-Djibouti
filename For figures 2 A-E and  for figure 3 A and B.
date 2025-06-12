@@ -473,7 +473,7 @@ plot1 <- ggplot(violine_plot, aes(x = as.factor(day), y = log10(pf_par_ul + 0.9)
   )
 plot1
 
-### gametocyte prevalnce
+### gametocyte prevalnce for Figure 3
 gam_prevalnce =read.xlsx("fig3A_B.xlsx")
 long_df <- gam_prevalnce %>%
   mutate(prevalence = ifelse(gam_status =="Negative", 0,
@@ -560,8 +560,8 @@ gam1 <- ggplot(data = gam_prevalnce, aes(x = as.factor(day), y = log10(gam_dens)
     plot.title = element_text(family = "Times New Roman", size = 10,face="bold")  # Customize title font and size
   )
 gam1 
-
-temp= read_xlsx("D:\\Pv_TES2023\\final out put_Tes23_24\\Plot\\Djibuti\\all documents of Djibouti\\Data\\fever clerance and hgb recovery.xlsx")
+## Supplemental figure 1
+temp= read_xlsx("fever clerance and hgb recovery.xlsx")
 temp= temp %>%
   filter(day %in% c("1","2","3","7","14","21","28"))
 temp$day= as.factor(temp$day)
@@ -589,7 +589,7 @@ temp_update <- ggplot(temp, aes(x = day, y = prop), color = "#BC3C29FF") +
   )
 
 temp_update
-## for hgb
+## for anaemia recovery. 
 hgbr= temp %>%
   filter(day_an %in% c("7","14","21","28"))
 hgbr$day_an= as.factor(hgbr$day_an)
