@@ -46,7 +46,7 @@ library(readxl)
 
 ##
 ###### for figure 2 A treatment outcome
-itt= read_xls("Figure 2A endpoint.xls")
+itt= read_xls("Figure 2A endpoint.csv")
 
 itt$day_To_transformed1 <- itt$Day  %>% 
   recode("1" = "1","2"="2", "3" = "3", "7" = "4", "14" = "5", "21" = "6", "28" = "7")
@@ -127,7 +127,7 @@ risk_table=  survout6a$data.survtable [survout6a$data.survtable$time %in% c(0:7)
 
 ggarrange(itt_Dj,risk_table,nrow = 2,ncol=1)
 ## figure 2b
-fig2b = read.xlsx( "fig2B.xlsx")
+fig2b = read.xlsx( "fig2B.csv")
 new_tes_data_filtered_new = fig2b %>%
   mutate(mic_gam_pos = ifelse(mic_status == "Positive" & gam_status== "Negative", "Asexual(+) only",
                               ifelse(gam_status == "Positive" & mic_status== "Negative", "Gameteocyte(+) only",
@@ -194,7 +194,7 @@ scatter
 #### fig 2C
 ## figure 2C KM plot
 
-pcr_mic_density= read.xlsx("par_density and pcr rate.xlsx")
+pcr_mic_density= read.xlsx("par_density and pcr rate.csv")
 
 long_form_data <- pcr_mic_density %>%
   pivot_longer(cols = c(par_status, parpcr_status),
@@ -266,8 +266,7 @@ plot_only_par<- survout6a$plot +
   scale_color_manual(values = c("#BC3C29FF","#0072B5FF"), labels = c( "Microscopy", "Pf18S qPCR")) +
   scale_fill_manual(values = c("#BC3C29FF","#0072B5FF"), labels = c( "Microscopy", "Pf18S qPCR"))
 
-# Print the modified plot
-print(plot_only_par)
+
 ###### risk table only
 km6a <- survfit(Surv(day_To_transformed1, Status) ~ Category, data = long_form_data)
 survout6a <- survminer::ggsurvplot(km6a, conf.int = FALSE, break.time.by = 1, risk.table = TRUE, risk.table.y.text.col = FALSE,
@@ -359,7 +358,7 @@ AA
 
 
 # Load the reshape2 package
-par_prevalence = read.xlsx("fig2D.xlsx")
+par_prevalence = read.xlsx("fig2D.csv")
 
 long_df <- par_prevalence %>%
   pivot_longer(cols = c(mic_status,pf_positivity),
@@ -446,7 +445,7 @@ pre_all=ggplot(percentage, aes(x = factor(day), y = prop1 * 100, fill = Mic_and_
   )
 pre_all
 # Now save with cairo_pdf device which handles fonts better
-violine_plot= read.xlsx("fig2E.xlsx")
+violine_plot= read.xlsx("fig2E.csv")
 violine_plot$day <- factor(violine_plot$day, levels = c(0, 1, 2, 3, 7, 14, 21, 28))
 
 plot1 <- ggplot(violine_plot, aes(x = as.factor(day), y = log10(pf_par_ul + 0.9))) +
@@ -474,7 +473,7 @@ plot1 <- ggplot(violine_plot, aes(x = as.factor(day), y = log10(pf_par_ul + 0.9)
 plot1
 
 ### gametocyte prevalnce for Figure 3
-gam_prevalnce =read.xlsx("fig3A_B.xlsx")
+gam_prevalnce =read.xlsx("fig3A_B.csv")
 long_df <- gam_prevalnce %>%
   mutate(prevalence = ifelse(gam_status =="Negative", 0,
                              ifelse(gam_status =="Positive",1,NA)))
@@ -561,7 +560,7 @@ gam1 <- ggplot(data = gam_prevalnce, aes(x = as.factor(day), y = log10(gam_dens)
   )
 gam1 
 ## Supplemental figure 1
-temp= read_xlsx("fever clerance and hgb recovery.xlsx")
+temp= read_xlsx("fever clerance and hgb recovery.csv")
 temp= temp %>%
   filter(day %in% c("1","2","3","7","14","21","28"))
 temp$day= as.factor(temp$day)
