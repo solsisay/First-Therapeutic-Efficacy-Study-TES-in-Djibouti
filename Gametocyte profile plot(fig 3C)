@@ -12,7 +12,7 @@ library(ggfortify)
 library(dplyr)
 library(haven)
 ## data
-Djibuti_21 = read.xlsx ("fig3C gam profile.xlsx")
+Djibuti_21 = read.xlsx ("fig3C gam profile.csv")
 # make it as numeric
 Djibuti_21$mic_dens <- as.numeric(gsub(",", "", Djibuti_21$mic_dens))
 Djibuti_21$pf_par_ul <- as.numeric(gsub(",", "", Djibuti_21$pf_par_ul))
